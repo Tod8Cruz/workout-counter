@@ -3,7 +3,7 @@ import { jointAngle, lineAngleToHorizontal, pickBetterSide } from '@/lib/geometr
 import { RepDetector } from './repStateMachine';
 import type { ExerciseDetector, PoseFrame } from './types';
 
-const CONFIG = { top: 150, bottom: 95, bottomExit: 105, minRepMs: 700, minVis: 0.5 };
+const CONFIG = { top: 140, bottom: 105, bottomExit: 115, minRepMs: 700, minVis: 0.4 };
 
 const LEFT = [LM.LEFT_SHOULDER, LM.LEFT_ELBOW, LM.LEFT_WRIST] as const;
 const RIGHT = [LM.RIGHT_SHOULDER, LM.RIGHT_ELBOW, LM.RIGHT_WRIST] as const;
@@ -15,9 +15,10 @@ function elbowAngle(f: PoseFrame): number | null {
   const [sh, el, wr] = side === 'left' ? LEFT : RIGHT;
   const hip = side === 'left' ? LM.LEFT_HIP : LM.RIGHT_HIP;
   const vis = Math.min(f.lm[sh].visibility, f.lm[el].visibility, f.lm[wr].visibility);
-  if (vis < CONFIG.minVis || f.lm[hip].visibility < 0.4) return null;
-  // 어깨-엉덩이 라인이 수평에 가까울 때만 푸시업 자세로 인정
-  if (lineAngleToHorizontal(f.lm[sh], f.lm[hip]) > 40) return null;
+  if (vis < CONFIG.minVis) return null;
+  // 자세 게이트는 엉덩이가 보일 때만 적용 — 바닥 근접 촬영에서 hip 미검출로
+  // 모든 프레임이 무효화되는 것을 막는다. 기준도 55도로 완화 (폰이 기울면 몸 라인 각도가 커짐)
+  if (f.lm[hip].visibility >= 0.4 && lineAngleToHorizontal(f.lm[sh], f.lm[hip]) > 55) return null;
   return jointAngle(f.world[sh], f.world[el], f.world[wr]);
 }
 

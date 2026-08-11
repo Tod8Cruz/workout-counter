@@ -3,7 +3,8 @@ import { jointAngle } from '@/lib/geometry/angles';
 import { RepDetector } from './repStateMachine';
 import type { ExerciseDetector, PoseFrame } from './types';
 
-const CONFIG = { top: 160, bottom: 100, bottomExit: 110, minRepMs: 700, minVis: 0.5 };
+// bottom 120: 하프 스쿼트 깊이도 1회로 인정 (100은 풀 스쿼트 수준이라 너무 빡셈)
+const CONFIG = { top: 160, bottom: 120, bottomExit: 130, minRepMs: 700, minVis: 0.5 };
 
 const LEGS: [number, number, number][] = [
   [LM.LEFT_HIP, LM.LEFT_KNEE, LM.LEFT_ANKLE],
