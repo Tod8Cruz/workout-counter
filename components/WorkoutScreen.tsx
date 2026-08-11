@@ -9,6 +9,7 @@ import { drawPose, type PoseStatus } from '@/lib/pose/draw';
 import { fullBodyCheck } from '@/lib/pose/fullBodyCheck';
 import { DEFAULT_ROUTINE } from '@/lib/routine/defaultRoutine';
 import { useRoutine } from '@/lib/routine/useRoutine';
+import { ding, primeBeep } from '@/lib/speech/beep';
 import { koCount, koSide } from '@/lib/speech/phrases.ko';
 import { primeVoice, speak } from '@/lib/speech/voice';
 import { saveSession } from '@/lib/storage/progress';
@@ -112,6 +113,7 @@ export default function WorkoutScreen() {
         const events = det.update(frame);
         for (const e of events) {
           if (e.type === 'rep') speak(koCount(e.count), 'count');
+          else if (e.type === 'phase' && e.phase === 'bottom') ding(); // 깊이 달성 피드백
           else if (e.type === 'holdStarted') speak('측정 시작');
           else if (e.type === 'formHint') speak(e.messageKo);
         }
@@ -146,6 +148,7 @@ export default function WorkoutScreen() {
     setLoading(true);
     setCamError(null);
     primeVoice();
+    primeBeep();
     try {
       await startCamera(videoRef.current!);
     } catch {
