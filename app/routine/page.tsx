@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { EXERCISES, type ExerciseId } from '@/lib/detectors/registry';
 import { DEFAULT_ITEMS, type RoutineItem } from '@/lib/routine/custom';
 
-type LoadState = 'loading' | 'ready' | 'unauthenticated';
+type LoadState = 'loading' | 'ready' | 'unauthenticated' | 'notfound';
 
 const EXERCISE_IDS = Object.keys(EXERCISES) as ExerciseId[];
 
@@ -41,27 +42,35 @@ function NumberField({
   );
 }
 
-export default function RoutinePage() {
+function RoutineBuilder() {
+  const router = useRouter();
+  const editId = useSearchParams().get('id');
   const [state, setState] = useState<LoadState>('loading');
-  const [dbConfigured, setDbConfigured] = useState(true);
+  const [name, setName] = useState('내 루틴');
   const [items, setItems] = useState<RoutineItem[]>(DEFAULT_ITEMS);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/routine')
-      .then((r) => r.json())
-      .then((d) => {
-        setDbConfigured(!!d.dbConfigured);
-        if (!d.authenticated) {
-          setState('unauthenticated');
-          return;
-        }
-        if (Array.isArray(d.items) && d.items.length) setItems(d.items);
+    const load = async () => {
+      if (editId) {
+        const res = await fetch(`/api/routines/${editId}`).catch(() => null);
+        if (!res) return setState('unauthenticated');
+        if (res.status === 401) return setState('unauthenticated');
+        if (!res.ok) return setState('notfound');
+        const d = await res.json();
+        setName(d.routine.name);
+        setItems(d.routine.items);
         setState('ready');
-      })
-      .catch(() => setState('unauthenticated'));
-  }, []);
+      } else {
+        // 새 루틴 — 로그인 여부만 확인
+        const res = await fetch('/api/routines').catch(() => null);
+        if (!res || res.status === 401) return setState('unauthenticated');
+        setState('ready');
+      }
+    };
+    load();
+  }, [editId]);
 
   const update = (idx: number, patch: Partial<RoutineItem>) => {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -78,17 +87,25 @@ export default function RoutinePage() {
   };
 
   const save = async () => {
+    if (!name.trim()) {
+      setNotice('루틴 이름을 입력해 주세요');
+      return;
+    }
     setSaving(true);
     setNotice(null);
     try {
-      const res = await fetch('/api/routine', {
-        method: 'PUT',
+      const res = await fetch(editId ? `/api/routines/${editId}` : '/api/routines', {
+        method: editId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ name: name.trim(), items }),
       });
-      if (res.ok) setNotice('저장했습니다 ✓');
-      else if (res.status === 401) setNotice('로그인이 필요합니다');
-      else if (res.status === 503) setNotice('DB가 아직 설정되지 않았습니다 (.env의 TURSO_* 확인)');
+      if (res.ok) {
+        router.push('/');
+        router.refresh();
+        return;
+      }
+      if (res.status === 401) setNotice('로그인이 필요합니다');
+      else if (res.status === 503) setNotice('DB가 설정되지 않았습니다');
       else setNotice('저장에 실패했습니다');
     } catch {
       setNotice('저장에 실패했습니다');
@@ -108,15 +125,26 @@ export default function RoutinePage() {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
         <div className="text-5xl">🔒</div>
-        <h1 className="text-2xl font-black">루틴 편집은 로그인이 필요해요</h1>
+        <h1 className="text-2xl font-black">루틴 만들기는 로그인이 필요해요</h1>
         <p className="text-neutral-400">내 루틴을 저장하고 어느 기기에서든 불러올 수 있습니다.</p>
-        <a
-          href="/api/auth/signin?callbackUrl=/routine"
+        <Link
+          href={`/login?next=${encodeURIComponent(editId ? `/routine?id=${editId}` : '/routine')}`}
           className="rounded-2xl bg-white px-8 py-3 font-bold text-black active:bg-neutral-200"
         >
-          Google로 로그인
-        </a>
+          로그인하러 가기
+        </Link>
         <Link href="/" className="text-sm text-neutral-500 underline">
+          홈으로
+        </Link>
+      </main>
+    );
+  }
+
+  if (state === 'notfound') {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
+        <h1 className="text-2xl font-black">루틴을 찾을 수 없습니다</h1>
+        <Link href="/" className="text-sm text-neutral-400 underline">
           홈으로
         </Link>
       </main>
@@ -126,16 +154,22 @@ export default function RoutinePage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col p-6 pb-32">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-black">루틴 편집</h1>
+        <h1 className="text-2xl font-black">{editId ? '루틴 편집' : '새 루틴 만들기'}</h1>
         <Link href="/" className="text-sm text-neutral-400 underline">
           홈으로
         </Link>
       </div>
-      {!dbConfigured && (
-        <p className="mb-4 rounded-xl bg-amber-500/15 px-4 py-3 text-sm text-amber-300">
-          Turso 환경변수가 없어 저장이 비활성화됩니다. (.env에 TURSO_DATABASE_URL / TURSO_AUTH_TOKEN)
-        </p>
-      )}
+
+      <label className="mb-5 flex flex-col gap-1 text-xs text-neutral-400">
+        루틴 이름
+        <input
+          value={name}
+          maxLength={40}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="예: 아침 루틴"
+          className="rounded-xl bg-white/10 px-4 py-3 text-lg font-bold text-white"
+        />
+      </label>
 
       <div className="space-y-3">
         {items.map((item, idx) => {
@@ -145,7 +179,9 @@ export default function RoutinePage() {
               <div className="mb-3 flex items-center gap-2">
                 <select
                   value={item.exerciseId}
-                  onChange={(e) => e.target.value && update(idx, { exerciseId: e.target.value as ExerciseId })}
+                  onChange={(e) =>
+                    e.target.value && update(idx, { exerciseId: e.target.value as ExerciseId })
+                  }
                   className="flex-1 rounded-lg bg-white/10 px-3 py-2 font-bold text-white"
                 >
                   {EXERCISE_IDS.map((id) => (
@@ -223,16 +259,30 @@ export default function RoutinePage() {
 
       <div className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-neutral-950/90 p-4 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md items-center gap-3">
-          {notice && <span className="text-sm text-neutral-300">{notice}</span>}
+          {notice && <span className="text-sm text-amber-300">{notice}</span>}
           <button
             onClick={save}
-            disabled={saving || !dbConfigured}
+            disabled={saving}
             className="ml-auto rounded-2xl bg-green-500 px-8 py-3 font-black text-black active:bg-green-400 disabled:opacity-40"
           >
-            {saving ? '저장 중…' : '저장'}
+            {saving ? '저장 중…' : editId ? '저장' : '루틴 만들기'}
           </button>
         </div>
       </div>
     </main>
+  );
+}
+
+export default function RoutinePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-dvh items-center justify-center text-neutral-400">
+          불러오는 중…
+        </main>
+      }
+    >
+      <RoutineBuilder />
+    </Suspense>
   );
 }

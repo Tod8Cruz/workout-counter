@@ -20,18 +20,35 @@ function Loading() {
   );
 }
 
+/** ?routine=<id> 지정 루틴 → 없으면 최신 루틴 → 없으면 기본 루틴 */
+async function resolveSteps(): Promise<RoutineStep[]> {
+  try {
+    const id = new URLSearchParams(window.location.search).get('routine');
+    if (id) {
+      const res = await fetch(`/api/routines/${encodeURIComponent(id)}`);
+      if (res.ok) {
+        const d = await res.json();
+        const items = sanitizeItems(d?.routine?.items);
+        if (items) return expandRoutine(items);
+      }
+    }
+    const res = await fetch('/api/routines');
+    if (res.ok) {
+      const d = await res.json();
+      const items = sanitizeItems(d?.routines?.[0]?.items);
+      if (items) return expandRoutine(items);
+    }
+  } catch {
+    // 네트워크/인증 실패 — 기본 루틴으로
+  }
+  return DEFAULT_ROUTINE;
+}
+
 export default function WorkoutPage() {
   const [steps, setSteps] = useState<RoutineStep[] | null>(null);
 
-  // 로그인 사용자의 저장된 루틴을 불러오고, 없으면 기본 루틴
   useEffect(() => {
-    fetch('/api/routine')
-      .then((r) => r.json())
-      .then((d) => {
-        const items = sanitizeItems(d?.items);
-        setSteps(items ? expandRoutine(items) : DEFAULT_ROUTINE);
-      })
-      .catch(() => setSteps(DEFAULT_ROUTINE));
+    resolveSteps().then(setSteps);
   }, []);
 
   if (!steps) return <Loading />;

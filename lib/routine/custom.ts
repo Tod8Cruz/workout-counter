@@ -56,6 +56,14 @@ export function expandRoutine(items: RoutineItem[]): RoutineStep[] {
   return steps;
 }
 
+/** 루틴 이름 검증. 유효하지 않으면 null */
+export function sanitizeName(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const s = raw.trim();
+  if (!s || s.length > 40) return null;
+  return s;
+}
+
 /** API 입력 검증. 유효하지 않으면 null */
 export function sanitizeItems(raw: unknown): RoutineItem[] | null {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > 30) return null;

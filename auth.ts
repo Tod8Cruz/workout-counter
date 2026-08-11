@@ -5,6 +5,7 @@ import Google from 'next-auth/providers/google';
 // DB 어댑터 없이 JWT 세션 — 사용자 식별은 Google sub(token.sub)로 한다.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [Google],
+  pages: { signIn: '/login' },
   callbacks: {
     session({ session, token }) {
       if (session.user && token.sub) session.user.id = token.sub;
