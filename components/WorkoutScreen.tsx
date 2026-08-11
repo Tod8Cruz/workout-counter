@@ -7,8 +7,8 @@ import { startCamera, stopCamera } from '@/lib/camera';
 import { PoseEngine } from '@/lib/pose/engine';
 import { drawPose, type PoseStatus } from '@/lib/pose/draw';
 import { fullBodyCheck } from '@/lib/pose/fullBodyCheck';
-import { DEFAULT_ROUTINE } from '@/lib/routine/defaultRoutine';
 import { useRoutine } from '@/lib/routine/useRoutine';
+import type { RoutineStep } from '@/lib/routine/types';
 import { ding, primeBeep } from '@/lib/speech/beep';
 import { koCount, koSide } from '@/lib/speech/phrases.ko';
 import { primeVoice, speak } from '@/lib/speech/voice';
@@ -23,8 +23,7 @@ import SummaryScreen from './SummaryScreen';
 
 const COUNTDOWN_KO = ['하나', '둘', '셋'];
 
-export default function WorkoutScreen() {
-  const steps = DEFAULT_ROUTINE;
+export default function WorkoutScreen({ steps }: { steps: RoutineStep[] }) {
   const { state, dispatch, countdownLeft, restLeft } = useRoutine(steps);
 
   const videoRef = useRef<HTMLVideoElement>(null);

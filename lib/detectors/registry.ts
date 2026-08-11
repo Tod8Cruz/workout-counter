@@ -29,6 +29,8 @@ export interface ExerciseMeta {
   requiredChains: number[][];
   /** 수동 +/- 보정 버튼 강조 표시 */
   manualAdjust?: boolean;
+  /** 좌우 각각 수행하는 운동 — 실행 시 좌/우 교대 단계로 펼쳐진다 */
+  perSide?: boolean;
   create(): ExerciseDetector;
 }
 
@@ -108,6 +110,7 @@ export const EXERCISES: Record<ExerciseId, ExerciseMeta> = {
       [LM.LEFT_SHOULDER, LM.LEFT_ELBOW, LM.LEFT_HIP, LM.LEFT_ANKLE],
       [LM.RIGHT_SHOULDER, LM.RIGHT_ELBOW, LM.RIGHT_HIP, LM.RIGHT_ANKLE],
     ],
+    perSide: true,
     create: createSidePlankDetector,
   },
   singleleg: {
@@ -120,6 +123,7 @@ export const EXERCISES: Record<ExerciseId, ExerciseMeta> = {
     requiredChains: [
       [LM.LEFT_HIP, LM.RIGHT_HIP, LM.LEFT_KNEE, LM.RIGHT_KNEE, LM.LEFT_ANKLE, LM.RIGHT_ANKLE],
     ],
+    perSide: true,
     create: createSingleLegStandDetector,
   },
 };

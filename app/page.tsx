@@ -1,58 +1,87 @@
 import Link from "next/link";
-import { DEFAULT_ROUTINE } from "@/lib/routine/defaultRoutine";
+import { getSession, signIn, signOut } from "@/auth";
 import { EXERCISES } from "@/lib/detectors/registry";
-import type { RoutineStep } from "@/lib/routine/types";
+import { loadRoutineItems } from "@/lib/db";
+import { DEFAULT_ITEMS, type RoutineItem } from "@/lib/routine/custom";
 
-function targetLabel(step: RoutineStep, count: number): string {
-  const t = step.target;
-  if (t.type === "reps") {
-    const reps = t.min === t.max ? `${t.max}회` : `${t.min}~${t.max}회`;
-    return `${reps} × ${count}`;
-  }
-  const sec =
-    t.minMs === t.maxMs
-      ? `${Math.round(t.maxMs / 1000)}초`
-      : `${Math.round(t.minMs / 1000)}~${Math.round(t.maxMs / 1000)}초`;
-  return `${sec} × ${count}`;
+export const dynamic = "force-dynamic";
+
+function targetLabel(item: RoutineItem): string {
+  const meta = EXERCISES[item.exerciseId];
+  const unit = meta.kind === "rep" ? "회" : "초";
+  return `${item.value}${unit} × ${item.sets}${meta.perSide ? " (좌우)" : ""}`;
 }
 
-export default function Home() {
-  // 좌우 교대로 펼쳐진 단계를 운동별로 묶어 표시
-  const grouped: { step: RoutineStep; count: number }[] = [];
-  for (const step of DEFAULT_ROUTINE) {
-    const last = grouped[grouped.length - 1];
-    if (last && last.step.exerciseId === step.exerciseId) {
-      last.count += step.sets;
-    } else {
-      grouped.push({ step, count: step.sets });
+export default async function Home() {
+  const session = await getSession();
+  const userId = session?.user?.id;
+
+  let items: RoutineItem[] | null = null;
+  if (userId) {
+    try {
+      items = await loadRoutineItems(userId);
+    } catch (e) {
+      console.error("[home] routine load failed", e);
     }
   }
+  const routine = items ?? DEFAULT_ITEMS;
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col p-6">
-      <h1 className="mb-1 text-3xl font-black">💪 홈트 트래커</h1>
+      <div className="mb-1 flex items-start justify-between">
+        <h1 className="text-3xl font-black">💪 홈트 트래커</h1>
+        {session?.user ? (
+          <form
+            action={async () => {
+              "use server";
+              await signOut();
+            }}
+          >
+            <button className="text-xs text-neutral-500 underline">
+              {session.user.name ?? "사용자"} · 로그아웃
+            </button>
+          </form>
+        ) : (
+          <form
+            action={async () => {
+              "use server";
+              await signIn("google");
+            }}
+          >
+            <button className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-black active:bg-neutral-200">
+              Google 로그인
+            </button>
+          </form>
+        )}
+      </div>
       <p className="mb-6 text-neutral-400">
         카메라가 자세를 인식해 자동으로 카운트하고 다음 운동을 안내합니다.
       </p>
 
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="font-bold text-neutral-300">
+          {items ? "내 루틴" : "기본 루틴"}
+        </h2>
+        <Link href="/routine" className="text-sm text-green-400 underline">
+          루틴 편집
+        </Link>
+      </div>
       <div className="mb-8 space-y-2">
-        {grouped.map(({ step, count }) => {
-          const meta = EXERCISES[step.exerciseId];
-          const perSide = step.side ? " (좌우)" : "";
+        {routine.map((item, i) => {
+          const meta = EXERCISES[item.exerciseId];
           return (
             <div
-              key={step.exerciseId}
+              key={i}
               className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3"
             >
               <div>
                 <div className="font-bold">
                   {meta.cameraIcon} {meta.nameKo}
-                  {perSide}
                 </div>
                 <div className="text-sm text-neutral-400">{meta.purposeKo}</div>
               </div>
               <div className="font-semibold tabular-nums text-neutral-300">
-                {targetLabel(step, count)}
+                {targetLabel(item)}
               </div>
             </div>
           );
